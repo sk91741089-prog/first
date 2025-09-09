@@ -14,6 +14,13 @@ model = pack["model"]
 X_cols = pack["X_cols"]
 GLOBAL_MAE = float(pack.get("mae", 0.3))
 
+# (선택) 런타임 버전 표시
+try:
+    import sklearn
+    st.caption(f"Runtime → scikit-learn {sklearn.__version__} / numpy {np.__version__}")
+except Exception:
+    pass
+
 st.markdown("### 호수효과 서해안 대설 **1시간 적설량 예측** (보조지표 웹앱)")
 st.caption("모델: RandomForestRegressor (개선 전처리+가이던스 변수 포함) | 예측 표시: 값 ± MAE")
 
@@ -26,6 +33,23 @@ SITES = {
     "고창": {"lat": 35.348, "lon": 126.599, "elev": 52.42},
 }
 TARGET_SITES = list(SITES.keys())
+
+# ===== 보조 함수: RH/Tw 계산 =====
+def rh_from_T_Td(T, Td):
+    """기온/이슬점으로 상대습도(%) 근사"""
+    es = 6.112 * np.exp((17.62 * T) / (243.12 + T))
+    e  = 6.112 * np.exp((17.62 * Td) / (243.12 + Td))
+    return float(np.clip(100.0 * (e / es), 0.0, 100.0))
+
+def wetbulb_stull(T, RH):
+    """Stull(2011) 근사식으로 습구온도(°C) 계산"""
+    return float(
+        T*np.arctan(0.151977*np.sqrt(RH+8.313659))
+        + np.arctan(T+RH)
+        - np.arctan(RH-1.676331)
+        + 0.00391838*(RH**1.5)*np.arctan(0.023101*RH)
+        - 4.686035
+    )
 
 # ===== 좌측 입력, 우측 지도 =====
 left, right = st.columns([1,2])
@@ -74,13 +98,22 @@ with left:
     # 파생 계산
     w10_sin, w10_cos   = np.sin(np.radians(wdir10)), np.cos(np.radians(wdir10))
     w850_sin, w850_cos = np.sin(np.radians(wdir850)), np.cos(np.radians(wdir850))
+    RH = rh_from_T_Td(T, Td)
+    Tw = wetbulb_stull(T, RH)
     KTS20_MS = 20 * 0.514444
+
+    # 700hPa 해기차 점수화
+    h700 = sst - T700
+    if h700 <= 22: bin700 = 0
+    elif h700 <= 25: bin700 = 1
+    elif h700 <= 30: bin700 = 2
+    else: bin700 = 3
 
     # 특징 벡터 구성: X_cols에 맞춰 채움 (SST 단일 입력을 두 컬럼에 동일 주입)
     feat = {
         '기온(°C)': T,
         '이슬점온도(°C)': Td,
-        '습구온도(°C)': np.nan,  # 선택항목
+        '습구온도(°C)': Tw,
         '10m 풍속(m/s)': wsp10,
         '풍향_sin': w10_sin,
         '풍향_cos': w10_cos,
@@ -95,17 +128,12 @@ with left:
         '850풍향_cos': w850_cos,
 
         '850hPa 해기차(°C)': sst - T850,
-        '700hPa 해기차(°C)': sst - T700,
+        '700hPa 해기차(°C)': h700,
 
         '규칙_풍향_300_330': int(300 <= wdir850 <= 330),
         '규칙_풍속_20kts이상': int(wsp850 >= KTS20_MS),
         '규칙_850T_영하8이하': int(T850 <= -8),
         '규칙_850해기차_20이상': int((sst - T850) >= 20),
-
-        '핵심규칙_충족': 0,            # 아래에서 계산
-        '700해기차_bin': 0,           # (단순화) 필요 시 점수화 로직 확장
-        '700해기차_점수': 0.0,
-        '규칙x700점수': 0.0,
 
         '1시간 강수량(mm)': prcp,
         '고도(m)': float(elev) if not pd.isna(elev) else 0.0,
@@ -116,10 +144,15 @@ with left:
         feat['규칙_850T_영하8이하']==1 and
         feat['규칙_850해기차_20이상']==1
     )
+    feat['700해기차_bin']   = bin700
+    feat['700해기차_점수']  = float(bin700)
+    feat['규칙x700점수']   = float(feat['핵심규칙_충족']) * float(bin700)
 
-    # X_cols 순서대로 행 만들기 (없는 컬럼은 NaN)
+    # X_cols 순서대로 행 만들기 (없는 컬럼은 NaN) + 안전망: NaN -> 0
     row = {c: (feat[c] if c in feat else np.nan) for c in X_cols}
     X_input = pd.DataFrame([row], columns=X_cols)
+    if X_input.isna().any().any():
+        X_input = X_input.fillna(0.0)
 
     if st.button("예측 실행"):
         yhat = float(model.predict(X_input)[0])
@@ -165,6 +198,8 @@ with right:
         row2 = {**row}
         row2['고도(m)'] = info['elev']
         X2 = pd.DataFrame([row2], columns=X_cols)
+        if X2.isna().any().any():
+            X2 = X2.fillna(0.0)
         pred = float(model.predict(X2)[0])
         results.append((name, info["lat"], info["lon"], pred))
 
