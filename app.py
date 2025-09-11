@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import folium, cloudpickle as cp
 from streamlit_folium import st_folium
+from html import escape  # 변수명 안전 출력용
 
 st.set_page_config(
     page_title="호수효과에 의한 서해안형 대설 1시간 적설량 예측 RandomForest 모델",
@@ -251,19 +252,31 @@ if SRC:
 else:
     st.info("엑셀 메타정보가 pack에 포함되지 않았습니다.")
 
-# 🌍 기본 변수 (17개)
-st.markdown("### 🌍 기본 변수 (17개)")
-if DISPLAY_BASIC:
-    st.markdown("\\n".join([f"- {v}" for v in DISPLAY_BASIC]))
-else:
-    st.write("—")
+# ===== 변수 목록: 온점(·) 구분 + 행간 개선 =====
+# 공통 스타일 (온점, 줄간격, 줄바꿈 시 가독성)
+st.markdown("""
+<style>
+.var-block{line-height:1.9; font-size:0.95rem;}
+.var-line{margin: 6px 0 14px 0;}
+.dot{opacity:0.55; padding: 0 8px;}
+</style>
+""", unsafe_allow_html=True)
 
-# 📌 선행연구 규칙 기반 변수 (8개)
-st.markdown("### 📌 선행연구 규칙 기반 변수 (8개)")
-if DISPLAY_RULES:
-    st.markdown("\\n".join([f"- {v}" for v in DISPLAY_RULES]))
-else:
-    st.write("—")
+def render_var_line(title, items):
+    if not items:
+        st.write("—")
+        return
+    # 항목 텍스트를 HTML-escape하고 온점으로 연결
+    items_escaped = [escape(str(v)) for v in items]
+    joined = f' <span class="dot">·</span> '.join(items_escaped)
+    st.markdown(
+        f'<div class="var-block"><b>{escape(title)}</b>'
+        f'<div class="var-line">{joined}</div></div>',
+        unsafe_allow_html=True
+    )
+
+render_var_line("🌍 기본 변수 (17개)", DISPLAY_BASIC)
+render_var_line("📌 선행연구 규칙 기반 변수 (8개)", DISPLAY_RULES)
 
 # ===== 엑셀 미리보기 (파일→내장텍스트 fallback) =====
 st.markdown("**엑셀 미리보기(상위 50행)**")
