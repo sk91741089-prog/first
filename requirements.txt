@@ -1,12 +1,22 @@
-# requirements.txt (예시: 피클이 sklearn 1.6.1 / NumPy 2.x로 만들어졌을 때)
+# ===== requirements.txt =====
+# Python 3.10 기준 (Streamlit Cloud 기본 런타임 호환)
+
+# 핵심
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.4.2          # ← pkl을 이 버전으로 만들었으면 그대로 사용
+cloudpickle==2.2.1
+
+# 앱
 streamlit==1.37.1
 streamlit-folium==0.20.0
 folium==0.16.0
 
-# 핵심: 피클과 맞춤
-numpy==2.0.2
-pandas==2.2.3         # NumPy 2 지원 버전 권장
-scikit-learn==1.6.1   # 피클 제작 버전과 동일
-scipy==1.15.3
+# (streamlit 종속성에 포함되지만, 이미지/표 렌더링 안정성을 위해 명시)
+pillow==10.4.0
 
-cloudpickle==2.2.1
+# ===== 선택 가이드 =====
+# 만약 Colab에서 pkl을 scikit-learn 1.6.x로 만들었다면 아래처럼 한 줄만 교체:
+# scikit-learn==1.6.1
+#
+# 그리고 가능하면 pkl 생성 환경(Colab)과 동일한 버전으로 위 리스트를 맞추는 것이 최선입니다.
