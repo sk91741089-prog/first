@@ -1,5 +1,5 @@
 
-import os
+import os, io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,8 +12,12 @@ st.set_page_config(
 )
 
 # ===== 모델 로드 =====
-with open("snow_model.pkl","rb") as f:
-    pack = cp.load(f)
+try:
+    with open("snow_model.pkl","rb") as f:
+        pack = cp.load(f)
+except Exception as e:
+    st.error(f"모델/패키지 로드 오류: {e}\nrequirements.txt의 numpy/scikit-learn 버전을 피클 생성 환경과 맞춰주세요.")
+    st.stop()
 
 model = pack["model"]
 X_cols = pack["X_cols"]
@@ -22,8 +26,12 @@ METRICS = pack.get("metrics", {})
 GLOBAL_MAE = float(METRICS.get("mae", pack.get("mae", 0.3)))
 
 SRC = pack.get("source_meta", {})
+# 파일 경로(있으면 사용)
 PREVIEW_PATH = pack.get("preview_csv", None)
 SOURCE_XLSX = pack.get("source_excel_path", None)
+# pkl 내장 데이터(fallback)
+PREVIEW_TEXT = pack.get("preview_csv_text", None)      # str
+SOURCE_BYTES = pack.get("source_excel_bytes", None)    # bytes
 
 # 웹페이지 표시에 사용할 변수 리스트(표시용 텍스트)
 DISPLAY_BASIC = pack.get("display_basic_17", [])
@@ -143,7 +151,7 @@ with left:
     }
     feat['핵심규칙_충족'] = int(
         feat['규칙_풍향_300_330']==1 and
-        feat['규칙_풍속_20кts이상'.replace('к','k')]==1 and  # 안전한 표기
+        feat['규칙_풍속_20kts이상']==1 and
         feat['규칙_850T_영하8이하']==1 and
         feat['규칙_850해기차_20이상']==1
     )
@@ -223,7 +231,7 @@ st.write(
     "- **주의**: 입력 변수의 단위·컬럼명이 학습 시점과 달라지면 예측 정확도가 저하될 수 있습니다."
 )
 
-# ===== 업로드 엑셀 설명 + 변수 리스트 + 미리보기 =====
+# ===== 업로드 엑셀 설명 + 변수 리스트 =====
 st.markdown("#### 사용된 엑셀 설명")
 if SRC:
     st.info(SRC.get("description", "업로드된 학습용 엑셀 데이터셋입니다."))
@@ -235,52 +243,70 @@ else:
 # 🌍 기본 변수 (17개)
 st.markdown("### 🌍 기본 변수 (17개)")
 if DISPLAY_BASIC:
-    st.markdown("\n".join([f"- {v}" for v in DISPLAY_BASIC]))
+    st.markdown("\\n".join([f"- {v}" for v in DISPLAY_BASIC]))
 else:
     st.write("—")
 
 # 📌 선행연구 규칙 기반 변수 (8개)
 st.markdown("### 📌 선행연구 규칙 기반 변수 (8개)")
 if DISPLAY_RULES:
-    st.markdown("\n".join([f"- {v}" for v in DISPLAY_RULES]))
+    st.markdown("\\n".join([f"- {v}" for v in DISPLAY_RULES]))
 else:
     st.write("—")
 
-# 엑셀 미리보기
+# ===== 엑셀 미리보기 (파일→내장텍스트 fallback) =====
 st.markdown("**엑셀 미리보기(상위 50행)**")
 if PREVIEW_PATH and os.path.exists(PREVIEW_PATH):
-    try:
-        prev = pd.read_csv(PREVIEW_PATH)
-        st.dataframe(prev, use_container_width=True)
-    except Exception as e:
-        st.warning(f"미리보기 로드 실패: {e}")
+    prev = pd.read_csv(PREVIEW_PATH)
+    st.dataframe(prev, use_container_width=True)
+elif PREVIEW_TEXT:
+    prev = pd.read_csv(io.StringIO(PREVIEW_TEXT))
+    st.dataframe(prev, use_container_width=True)
 else:
-    st.info("미리보기 파일(uploaded_preview.csv)이 없습니다.")
+    st.info("미리보기 데이터가 없습니다.")
 
-# ===== 데이터 다운로드 =====
+# ===== 데이터 다운로드 (파일→내장바이트/텍스트 fallback) =====
 st.markdown("#### 데이터 다운로드")
-cols_dl = st.columns(2)
-with cols_dl[0]:
+cA, cB = st.columns(2)
+
+with cA:  # 원본 엑셀
     if SOURCE_XLSX and os.path.exists(SOURCE_XLSX):
         with open(SOURCE_XLSX, "rb") as f:
             st.download_button(
-                label="⬇️ 원본 엑셀 내려받기",
+                "⬇️ 원본 엑셀 내려받기",
                 data=f.read(),
                 file_name=SRC.get("source_filename", "uploaded_source.xlsx"),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+    elif SOURCE_BYTES:
+        st.download_button(
+            "⬇️ 원본 엑셀 내려받기",
+            data=SOURCE_BYTES,
+            file_name=SRC.get("source_filename", "uploaded_source.xlsx"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
     else:
-        st.info("원본 엑셀 파일을 찾지 못했습니다.")
-with cols_dl[1]:
+        st.info("원본 엑셀 데이터가 없습니다.")
+
+with cB:  # 미리보기 CSV
     if PREVIEW_PATH and os.path.exists(PREVIEW_PATH):
         with open(PREVIEW_PATH, "rb") as f:
             st.download_button(
-                label="⬇️ 미리보기 CSV 내려받기(상위 50행)",
+                "⬇️ 미리보기 CSV 내려받기(상위 50행)",
                 data=f.read(),
                 file_name="uploaded_preview.csv",
                 mime="text/csv",
                 use_container_width=True,
             )
+    elif PREVIEW_TEXT:
+        st.download_button(
+            "⬇️ 미리보기 CSV 내려받기(상위 50행)",
+            data=PREVIEW_TEXT.encode("utf-8"),
+            file_name="uploaded_preview.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
     else:
-        st.info("미리보기 CSV를 찾지 못했습니다.")
+        st.info("미리보기 CSV가 없습니다.")
