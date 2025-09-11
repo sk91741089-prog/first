@@ -1,7 +1,12 @@
+# requirements.txt (예시: 피클이 sklearn 1.6.1 / NumPy 2.x로 만들어졌을 때)
 streamlit==1.37.1
 streamlit-folium==0.20.0
 folium==0.16.0
-pandas==2.2.2
-numpy==1.26.4        # numpy<2 권장 (sklearn 호환)
-scikit-learn==1.4.2  # 로컬 학습 버전에 맞추면 더 좋음
+
+# 핵심: 피클과 맞춤
+numpy==2.0.2
+pandas==2.2.3         # NumPy 2 지원 버전 권장
+scikit-learn==1.6.1   # 피클 제작 버전과 동일
+scipy==1.15.3
+
 cloudpickle==2.2.1
