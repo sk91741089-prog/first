@@ -12,6 +12,17 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- 상단 우측 크레딧 ---
+st.markdown(
+    """
+    <div style='text-align: right; color: gray; font-size: 0.9em;'>
+        Developed by 전주기상지청 박성웅
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+# ------------------------
+
 # ===== 모델 로드 =====
 try:
     with open("snow_model.pkl","rb") as f:
