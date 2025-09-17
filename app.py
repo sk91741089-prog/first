@@ -185,28 +185,29 @@ with right:
         return "#1f77b4" if v < 1 else ("#2ca02c" if v < 3 else ("#ff7f0e" if v < 5 else "#d62728"))
 
     legend_html = """
-    <div style="padding:8px 10px; background:#ffffff; border:1px solid #ddd; border-radius:8px; display:inline-block;">
-      <div style="font-weight:600; margin-bottom:6px;">색상 기준 (cm/h)</div>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#1f77b4; border:1px solid #333;"></span>
-          <span>&lt; 1</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#2ca02c; border:1px solid #333;"></span>
-          <span>1–3</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#ff7f0e; border:1px solid #333;"></span>
-          <span>3–5</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#d62728; border:1px solid #333;"></span>
-          <span>≥ 5</span>
-        </div>
-      </div>
+<div style="padding:12px 14px; background:#ffffff; border:1px solid #ddd; border-radius:10px; display:inline-block; font-size:1.06rem; color:#0d47a1;">
+  <div style="font-weight:700; margin-bottom:8px;">색상 기준 (cm/h)</div>
+  <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="display:inline-block; width:16px; height:16px; background:#1f77b4; border:1px solid #333;"></span>
+      <span>&lt; 1</span>
     </div>
-    """
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="display:inline-block; width:16px; height:16px; background:#2ca02c; border:1px solid #333;"></span>
+      <span>1–3</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="display:inline-block; width:16px; height:16px; background:#ff7f0e; border:1px solid #333;"></span>
+      <span>3–5</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="display:inline-block; width:16px; height:16px; background:#d62728; border:1px solid #333;"></span>
+      <span>≥ 5</span>
+    </div>
+  </div>
+</div>
+"""
+
     st.markdown(legend_html, unsafe_allow_html=True)
 
     # 지도 생성
