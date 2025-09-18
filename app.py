@@ -21,7 +21,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# ------------------------
 
 # ===== 모델 로드 =====
 try:
@@ -87,6 +86,10 @@ def wetbulb_stull(T, RH):
         + 0.00391838*(RH**1.5)*np.arctan(0.023101*RH)
         - 4.686035
     )
+
+# ▶ 예측 결과(최근 1건)를 보관할 세션 상태
+if "last_pred" not in st.session_state:
+    st.session_state["last_pred"] = None
 
 # ===== 좌측 입력 · 우측 지도 =====
 left, right = st.columns([1,2])
@@ -174,9 +177,19 @@ with left:
     row = {c: (feat[c] if c in feat else np.nan) for c in X_cols}
     X_input = pd.DataFrame([row], columns=X_cols).fillna(0.0)
 
+    # ▶ 예측 실행 버튼
     if st.button("예측 실행"):
         yhat = float(model.predict(X_input)[0])
         st.success(f"예측 적설량: **{yhat:.2f} cm/h** (±{GLOBAL_MAE:.2f})")
+
+        # 지도 표출용 정보 저장 (단일 지점만 표시)
+        site_label = site_selected if site_selected else f"사용자 좌표({lat:.3f}, {lon:.3f})"
+        st.session_state["last_pred"] = {
+            "name": site_label,
+            "lat": float(lat),
+            "lon": float(lon),
+            "pred": yhat,
+        }
 
 with right:
     st.subheader("🗺️ 예측 지도")
@@ -184,6 +197,7 @@ with right:
     def color_for(v):
         return "#1f77b4" if v < 1 else ("#2ca02c" if v < 3 else ("#ff7f0e" if v < 5 else "#d62728"))
 
+    # 확대된 범례(파란 글씨)
     legend_html = """
 <div style="padding:12px 14px; background:#ffffff; border:1px solid #ddd; border-radius:10px; display:inline-block; font-size:1.06rem; color:#0d47a1;">
   <div style="font-weight:700; margin-bottom:8px;">색상 기준 (cm/h)</div>
@@ -207,27 +221,61 @@ with right:
   </div>
 </div>
 """
-
     st.markdown(legend_html, unsafe_allow_html=True)
 
-    # 지도 생성
+    # 지도 생성 (기본 중심: 전북)
     m = folium.Map(location=[35.8, 126.9], zoom_start=8)
 
-    # 5개 지점 일괄 예측
-    results = []
-    for name, info in SITES.items():
-        row2 = {**row, '고도(m)': info['elev']}
-        X2 = pd.DataFrame([row2], columns=X_cols).fillna(0.0)
-        pred = float(model.predict(X2)[0])
-        results.append((name, info["lat"], info["lon"], pred))
+    pred_info = st.session_state.get("last_pred")
 
-    for name, lat0, lon0, pred in results:
-        col = color_for(pred)
+    if pred_info:
+        # ▶ 단일 지점 원(색상 4단계)
+        col = color_for(pred_info["pred"])
         folium.CircleMarker(
-            location=[lat0, lon0],
+            location=[pred_info["lat"], pred_info["lon"]],
             radius=10,
             color=col, fill=True, fill_color=col, fill_opacity=0.9,
-            tooltip=f"{name}: {pred:.2f} cm/h ±{GLOBAL_MAE:.2f}"
+            tooltip=f"{pred_info['name']}: {pred_info['pred']:.2f} cm/h ±{GLOBAL_MAE:.2f}"
+        ).add_to(m)
+
+        # ▶ 예측값 라벨(하얀 박스): 지점명 굵게+살짝 크게, 한 줄 유지
+        name_text   = escape(pred_info["name"])
+        detail_text = f"예측 적설량: {pred_info['pred']:.2f} cm/h (±{GLOBAL_MAE:.2f})"
+        label_html = f"""
+<div style="
+  display:inline-block;
+  background:#fff; padding:8px 10px;
+  border:1px solid #999; border-radius:8px;
+  white-space: nowrap; word-break: keep-all;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);">
+  <span style="font-weight:700; font-size:1.05rem; vertical-align:middle;">{name_text}</span>
+  <span style="font-size:0.95rem; margin-left:6px; vertical-align:middle;">, {escape(detail_text)}</span>
+</div>
+"""
+        folium.Marker(
+            location=[pred_info["lat"], pred_info["lon"]],
+            icon=folium.DivIcon(
+                html=label_html,
+                icon_size=(380, 34),   # 충분한 폭/높이로 세로 줄바꿈 방지
+                icon_anchor=(0, 0)
+            )
+        ).add_to(m)
+    else:
+        # ▶ 예측 전 안내문 (한 줄 고정)
+        info_html = """
+<div style="
+  display:inline-block;
+  background:#fff; padding:6px 10px;
+  border:1px solid #ccc; border-radius:8px;
+  white-space: nowrap; word-break: keep-all;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+  font-size:.95rem;">
+  좌측 <b>예측 실행</b> 버튼을 누르세요
+</div>
+"""
+        folium.Marker(
+            location=[35.8, 126.9],
+            icon=folium.DivIcon(html=info_html, icon_size=(220, 28), icon_anchor=(0, 0))
         ).add_to(m)
 
     st_folium(m, width=900, height=600)
@@ -265,7 +313,6 @@ else:
     st.info("엑셀 메타정보가 pack에 포함되지 않았습니다.")
 
 # ===== 변수 목록: 온점(·) 구분 + 행간 개선 =====
-# 공통 스타일 (온점, 줄간격, 줄바꿈 시 가독성)
 st.markdown("""
 <style>
 .var-block{line-height:1.9; font-size:0.95rem;}
@@ -278,7 +325,6 @@ def render_var_line(title, items):
     if not items:
         st.write("—")
         return
-    # 항목 텍스트를 HTML-escape하고 온점으로 연결
     items_escaped = [escape(str(v)) for v in items]
     joined = f' <span class="dot">·</span> '.join(items_escaped)
     st.markdown(
