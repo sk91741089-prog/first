@@ -12,6 +12,13 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- 테마 감지(라이트/다크) ---
+try:
+    THEME_BASE = st.get_option("theme.base")
+except Exception:
+    THEME_BASE = "light"
+IS_DARK = str(THEME_BASE).lower() == "dark"
+
 # --- 상단 우측 크레딧 ---
 st.markdown(
     """
@@ -238,44 +245,47 @@ with right:
             tooltip=f"{pred_info['name']}: {pred_info['pred']:.2f} cm/h ±{GLOBAL_MAE:.2f}"
         ).add_to(m)
 
-        # ▶ 예측값 라벨(하얀 박스): 지점명 굵게+살짝 크게, 한 줄 유지
+        # ▶ 예측값 라벨(하얀 박스): 지점명 굵게+살짝 크게, 한 줄 유지 (다크모드 텍스트 색 고정)
         name_text   = escape(pred_info["name"])
         detail_text = f"예측 적설량: {pred_info['pred']:.2f} cm/h (±{GLOBAL_MAE:.2f})"
+        LABEL_TEXT_COLOR = "#111111"   # 하얀 배경 위 가독성 확보
+        LABEL_BORDER     = "#999999"
         label_html = f"""
 <div style="
   display:inline-block;
-  background:#fff; padding:8px 10px;
-  border:1px solid #999; border-radius:8px;
+  background:#ffffff; padding:8px 10px;
+  border:1px solid {LABEL_BORDER}; border-radius:8px;
   white-space: nowrap; word-break: keep-all;
-  box-shadow:0 1px 3px rgba(0,0,0,.25);">
-  <span style="font-weight:700; font-size:1.05rem; vertical-align:middle;">{name_text}</span>
-  <span style="font-size:0.95rem; margin-left:6px; vertical-align:middle;">, {escape(detail_text)}</span>
+  box-shadow:0 1px 3px rgba(0,0,0,.25); color:{LABEL_TEXT_COLOR};">
+  <span style="font-weight:700; font-size:1.05rem; vertical-align:middle; color:{LABEL_TEXT_COLOR};">{name_text}</span>
+  <span style="font-size:0.95rem; margin-left:6px; vertical-align:middle; color:{LABEL_TEXT_COLOR};">, {escape(detail_text)}</span>
 </div>
 """
         folium.Marker(
             location=[pred_info["lat"], pred_info["lon"]],
             icon=folium.DivIcon(
                 html=label_html,
-                icon_size=(380, 34),   # 충분한 폭/높이로 세로 줄바꿈 방지
+                icon_size=(420, 36),   # 충분한 폭/높이로 세로 줄바꿈 방지
                 icon_anchor=(0, 0)
             )
         ).add_to(m)
     else:
-        # ▶ 예측 전 안내문 (한 줄 고정)
-        info_html = """
+        # ▶ 예측 전 안내문 (한 줄 고정, 다크모드 텍스트 색 고정)
+        INFO_TEXT_COLOR = "#111111"
+        info_html = f"""
 <div style="
   display:inline-block;
-  background:#fff; padding:6px 10px;
-  border:1px solid #ccc; border-radius:8px;
+  background:#ffffff; padding:6px 10px;
+  border:1px solid #cccccc; border-radius:8px;
   white-space: nowrap; word-break: keep-all;
   box-shadow:0 1px 3px rgba(0,0,0,.2);
-  font-size:.95rem;">
+  font-size:.95rem; color:{INFO_TEXT_COLOR};">
   좌측 <b>예측 실행</b> 버튼을 누르세요
 </div>
 """
         folium.Marker(
             location=[35.8, 126.9],
-            icon=folium.DivIcon(html=info_html, icon_size=(220, 28), icon_anchor=(0, 0))
+            icon=folium.DivIcon(html=info_html, icon_size=(240, 28), icon_anchor=(0, 0))
         ).add_to(m)
 
     st_folium(m, width=900, height=600)
@@ -291,15 +301,23 @@ st.write(
     "- **주의**: 입력 변수의 단위·컬럼명이 학습 시점과 달라지면 예측 정확도가 저하될 수 있습니다."
 )
 
-# ===== 사용된 엑셀 설명 + 데이터 구성(파란 박스) =====
+# ===== 사용된 엑셀 설명 + 데이터 구성(다크모드 대응) =====
 st.markdown("#### 사용된 엑셀 설명")
 if SRC:
     st.info(SRC.get("description", "업로드된 학습용 엑셀 데이터셋입니다."))
     st.write(f"- 파일명: **{SRC.get('source_filename','?')}**")
     st.write(f"- 크기: **{SRC.get('n_rows','?')} 행 × {SRC.get('n_cols','?')} 열**")
-    # ✅ 데이터 구성(파란 박스)
-    st.markdown("""
-    <div style="background-color:#e7f1fb; padding:12px; border-radius:8px; border:1px solid #bcd0ef; line-height:1.6;">
+
+    # 📘 데이터 구성 박스: 라이트/다크에 따라 배경/테두리/글자색 동적 적용
+    DATA_BG     = "#0f253d" if IS_DARK else "#e7f1fb"
+    DATA_BORDER = "#2a4f77" if IS_DARK else "#bcd0ef"
+    DATA_TEXT   = "#eaf4ff" if IS_DARK else "#0b1a2a"
+
+    st.markdown(f"""
+    <div style="
+      background-color:{DATA_BG};
+      padding:12px; border-radius:8px; border:1px solid {DATA_BORDER};
+      line-height:1.6; color:{DATA_TEXT};">
       <b>📘 데이터 구성</b><br>
       - 서해안형 대설 발생 대표지점 5곳 기준<br>
       - 최근 5년간 사례 기반<br>
